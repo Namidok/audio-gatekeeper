@@ -1,0 +1,26 @@
+# Secrets: never commit
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Generated test audio
+*.wav
+*.mp3
+*.flac
+*.npy
+
+# macOS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Frontend (for later)
+node_modules/
+.next/
