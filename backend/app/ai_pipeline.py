@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import torch
+import torchaudio.functional as AF
 from scipy.interpolate import CubicSpline
 
 from app.config import get_settings
@@ -116,6 +117,30 @@ def declip(samples: np.ndarray, threshold: float = 0.99) -> tuple[np.ndarray, in
         channels.append(fixed)
         repaired_total += repaired
     return np.stack(channels, axis=1), repaired_total
+
+
+# --------------------------------------------------------------------------- #
+# Step 12: resampling to 48 kHz (on the GPU when there is one)
+# --------------------------------------------------------------------------- #
+def resample(samples: np.ndarray, orig_sr: int, target_sr: int,
+             device: torch.device) -> np.ndarray:
+    """Change the sample rate of a (samples, channels) array. Peaks above 1.0 are kept."""
+    if orig_sr == target_sr:
+        return samples.astype(np.float32, copy=False)
+
+    # PyTorch audio wants (channels, samples), so flip the array before sending it
+    waveform = torch.from_numpy(np.ascontiguousarray(samples.T, dtype=np.float32)).to(device)
+    with torch.inference_mode():
+        out = AF.resample(
+            waveform,
+            orig_freq=orig_sr,
+            new_freq=target_sr,
+            lowpass_filter_width=64,              # longer filter = cleaner result
+            rolloff=0.9475937167399596,           # keep everything up to ~95% of Nyquist
+            resampling_method="sinc_interp_kaiser",
+            beta=14.769656459379492,              # strong suppression of aliasing
+        )
+    return out.T.contiguous().cpu().numpy()
 
 
 if __name__ == "__main__":
