@@ -261,7 +261,7 @@ def _find_issues(clipping: ClippingResult, dynamics: DynamicsResult, bandwidth: 
     if bandwidth.is_band_limited:
         severity, penalty = ("critical", 40) if bandwidth.cutoff_hz < 11_000 else ("warning", 30)
         issues.append(Issue("band_limited", severity, f"High frequencies cut off at {cutoff_khz:.1f} kHz (typical of low-bitrate MP3)", penalty))
-    elif bandwidth.cutoff_hz < bandwidth.nyquist_hz - 1000:
+    elif bandwidth.cutoff_hz < min(bandwidth.nyquist_hz - 1000, 20_000):
         issues.append(Issue("lossy_source", "info", f"Content stops at {cutoff_khz:.1f} kHz: likely a good-quality lossy source", 5))
 
     # Dynamics: squashed audio sounds flat and tiring
