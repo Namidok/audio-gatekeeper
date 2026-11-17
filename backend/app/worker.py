@@ -1,4 +1,4 @@
-"""Step 18: the Celery worker. Picks up jobs and runs the whole pipeline in the background.
+"""Step 18 + 20: the Celery worker. Picks up jobs and runs the whole pipeline in the background.
 
 Start it from backend/ with:
     celery -A app.worker worker --pool=solo --loglevel=info
@@ -16,6 +16,7 @@ from app.ai_pipeline import enhance
 from app.config import get_settings
 from app.dsp_diagnostics import analyze
 from app.job_store import JobStore
+from app.storage import Storage, is_valid_upload_key, output_key
 
 log = logging.getLogger(__name__)
 settings = get_settings()
@@ -51,28 +52,34 @@ STAGE_MESSAGES = {
     "mastering": "Mastering to -14 LUFS / -1 dBTP",
 }
 
-# Local folder that stands in for cloud storage until Step 19
-LOCAL_OUTPUTS = Path(__file__).resolve().parent.parent / "storage" / "outputs"
 
-
+# --------------------------------------------------------------------------- #
+# Step 20: files now come from and go to S3
+# --------------------------------------------------------------------------- #
 def _fetch_input(input_ref: str, workdir: Path) -> Path:
-    """Step 18: copy a local file. (Step 19 replaces this with an S3/R2 download.)"""
-    source = Path(input_ref)
-    if not source.is_file():
-        raise FileNotFoundError(f"Uploaded file not found: {input_ref}")
-    target = workdir / f"input{source.suffix.lower()}"
-    shutil.copyfile(source, target)
-    return target
+    """Download the user's upload from the bucket into this job's temp folder."""
+    if not is_valid_upload_key(input_ref):
+        raise ValueError("Invalid upload reference")          # not a key we created: refuse
+
+    storage = Storage()
+    size = storage.size_of(input_ref)
+    if size is None:
+        raise FileNotFoundError("The uploaded file was not found in storage (upload may have failed)")
+    if size > settings.max_upload_bytes:
+        raise ValueError(f"File is {size / 1_048_576:.0f} MB; the limit is {settings.max_upload_bytes / 1_048_576:.0f} MB")
+
+    target = workdir / f"input{Path(input_ref).suffix}"
+    return storage.download(input_ref, target)
 
 
 def _save_output(output: Path, job_id: str) -> str:
-    """Step 18: copy to a local folder. (Step 19 replaces this with an S3/R2 upload.)"""
-    LOCAL_OUTPUTS.mkdir(parents=True, exist_ok=True)
-    target = LOCAL_OUTPUTS / f"{job_id}.wav"
-    shutil.copyfile(output, target)
-    return str(target)
+    """Upload the mastered WAV to the bucket and return where it lives."""
+    return Storage().upload(output, output_key(job_id), content_type="audio/wav")
 
 
+# --------------------------------------------------------------------------- #
+# The job itself (unchanged from Step 18)
+# --------------------------------------------------------------------------- #
 @celery_app.task(name="process_job", bind=True, max_retries=2)
 def process_job(self, job_id: str) -> dict:
     store = JobStore()

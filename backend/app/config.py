@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     compute_device: str = "auto"         # "auto", "cuda", "mps" or "cpu"
     enable_audiosr: bool = True          # use AudioSR when it is installed
 
+    # ---------- Web API ----------
+    cors_origins: list[str] = ["http://localhost:3000"]   # websites allowed to call the API
+
 
 @lru_cache
 def get_settings() -> Settings:

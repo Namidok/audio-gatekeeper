@@ -89,7 +89,7 @@ class Storage:
         """A link the browser can PUT one file to. Type and exact size are locked in."""
         limit = get_settings().max_upload_bytes
         if size_bytes > limit:
-            raise ValueError(f"File is {size_bytes / 1e6:.0f} MB; the limit is {limit / 1e6:.0f} MB")
+            raise ValueError(f"File is {size_bytes / 1_048_576:.0f} MB; the limit is {limit / 1_048_576:.0f} MB")
         return self.s3.generate_presigned_url(
             "put_object",
             Params={"Bucket": self.bucket, "Key": key,
