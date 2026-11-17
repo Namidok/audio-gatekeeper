@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 import torch
@@ -143,10 +144,45 @@ def resample(samples: np.ndarray, orig_sr: int, target_sr: int,
     return out.T.contiguous().cpu().numpy()
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    print("PyTorch version :", torch.__version__)
-    print("CUDA available  :", torch.cuda.is_available())
-    print("MPS available   :", torch.backends.mps.is_available())
-    device = pick_device()
-    print("Selected device :", describe_device(device))
+# --------------------------------------------------------------------------- #
+# Step 13: bandwidth extension (AI super-resolution) with a safe fallback
+# --------------------------------------------------------------------------- #
+@dataclass
+class UpsampleResult:
+    samples: np.ndarray     # (samples, channels) at target_sr
+    sample_rate: int
+    method: str             # "audiosr" or "resample_only"
+    note: str               # plain-language explanation for the report card
+
+
+def audiosr_available() -> bool:
+    """True only if AudioSR AND our adapter for it can both be imported."""
+    try:
+        import audiosr  # noqa: F401
+        from app import audiosr_adapter  # noqa: F401
+        return True
+    except Exception:               # ImportError, or version clashes inside AudioSR
+        return False
+
+
+def bandwidth_extend(samples: np.ndarray, orig_sr: int, cutoff_hz: float,
+                     device: torch.device, target_sr: int = 48_000) -> UpsampleResult:
+    settings = get_settings()
+
+    if not settings.enable_audiosr:
+        note = "AudioSR is switched off (ENABLE_AUDIOSR=false); highs not restored"
+    elif not audiosr_available():
+        note = "AudioSR is not installed on this worker; highs not restored"
+    else:
+        try:
+            from app.audiosr_adapter import extend_with_audiosr
+            out = extend_with_audiosr(samples, orig_sr, cutoff_hz, device, target_sr)
+            return UpsampleResult(out, target_sr, "audiosr",
+                                  f"High frequencies above {cutoff_hz / 1000:.1f} kHz rebuilt with AudioSR")
+        except Exception as exc:
+            log.exception("AudioSR failed; falling back to plain resampling")
+            note = f"AudioSR failed ({exc.__class__.__name__}); highs not restored"
+
+    log.warning(note)
+    out = resample(samples, orig_sr, target_sr, device)
+    return UpsampleResult(out, target_sr, "resample_only", note)

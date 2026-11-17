@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     target_sample_rate: int = 48_000
 
     # ---------- Compute ----------
-    compute_device: str = "auto"         # "auto", "cuda" or "cpu"
+    compute_device: str = "auto"         # "auto", "cuda", "mps" or "cpu"
+    enable_audiosr: bool = True          # use AudioSR when it is installed
 
 
 @lru_cache
