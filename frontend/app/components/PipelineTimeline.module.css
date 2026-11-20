@@ -1,0 +1,152 @@
+.wrap {
+  margin-top: 4px;
+}
+
+.queued {
+  font-size: var(--step-1);
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.timeline {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+/* the connector to the previous node */
+.node + .node::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+
+.node.done + .node::before,
+.node.skipped + .node::before,
+.node.partial + .node::before {
+  background: var(--enhanced);
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--panel);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--bg);
+}
+
+.label {
+  font-weight: 650;
+  font-size: var(--step-1);
+}
+
+.caption {
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.done .dot {
+  background: var(--enhanced);
+  border-color: var(--enhanced);
+}
+
+.current .dot {
+  border-color: var(--enhanced);
+  animation: pulse 1.6s ease-out infinite;
+}
+
+.current .dot::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--enhanced);
+}
+
+.current .caption {
+  color: var(--enhanced);
+}
+
+.skipped .dot {
+  border-style: dashed;
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
+.partial .dot {
+  border-color: var(--warn);
+}
+
+.partial .caption {
+  color: var(--warn);
+}
+
+.failed .dot {
+  background: var(--crit);
+  border-color: var(--crit);
+}
+
+.failed .caption {
+  color: var(--crit);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--enhanced-glow);
+  }
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Narrow screens: a vertical timeline with labels to the right */
+@media (max-width: 640px) {
+  .timeline {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .node {
+    flex-direction: row;
+    text-align: left;
+    gap: 12px;
+  }
+
+  .node + .node::before {
+    top: -12px;
+    left: 13px;
+    right: auto;
+    width: 2px;
+    height: 14px;
+  }
+
+  .caption {
+    margin-left: auto;
+  }
+}

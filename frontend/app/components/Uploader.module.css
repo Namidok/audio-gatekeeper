@@ -1,0 +1,170 @@
+.wrap {
+  padding-top: 20px;
+}
+
+.zone {
+  position: relative;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+  padding: 28px 20px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.2s, background 0.2s;
+}
+
+.zone:hover {
+  border-color: var(--muted);
+}
+
+.compact .zone {
+  padding: 16px 20px;
+}
+
+.dragging {
+  border-style: solid;
+  border-color: var(--original);
+  box-shadow: 0 0 0 1px var(--original), 0 0 32px var(--original-glow);
+}
+
+.busy {
+  cursor: progress;
+}
+
+/* The flat line that wakes up into a waveform when a file is dragged over */
+.line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 40px;
+  margin-bottom: 12px;
+}
+
+.compact .line {
+  height: 20px;
+  margin-bottom: 6px;
+}
+
+.line span {
+  width: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  transition: height 0.25s ease, background 0.2s;
+}
+
+.dragging .line span {
+  background: var(--original);
+  animation: wake 0.9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -37ms);
+}
+
+.busy .line span {
+  background: var(--enhanced);
+  height: 6px;
+}
+
+@keyframes wake {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dragging .line span {
+    height: 18px;
+  }
+}
+
+.title {
+  font-size: var(--step-3);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.compact .title {
+  font-size: var(--step-2);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--step-1);
+  margin-top: 4px;
+}
+
+.bar {
+  height: 6px;
+  max-width: 420px;
+  margin: 14px auto 0;
+  border-radius: 999px;
+  background: var(--inset);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--enhanced);
+  transition: width 0.2s ease;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--step-1);
+  color: var(--muted);
+}
+
+.profile select {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.percent {
+  font-family: var(--font-num);
+  font-size: var(--step-1);
+  color: var(--enhanced);
+}
+
+.action {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.action:hover {
+  border-color: var(--text);
+}
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--crit);
+  background: var(--inset);
+  border-radius: var(--radius-control);
+  font-size: var(--step-1);
+}

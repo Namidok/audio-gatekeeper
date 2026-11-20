@@ -2,6 +2,7 @@ import logging
 import types
 from unittest.mock import patch
 
+from app.config import get_settings
 from app.ai_pipeline import audiosr_available, bandwidth_extend, pick_device
 from app.dsp_diagnostics import load_audio, measure_bandwidth
 
@@ -26,7 +27,8 @@ def crashing_audiosr(*args, **kwargs):
 fake_adapter = types.ModuleType("app.audiosr_adapter")
 fake_adapter.extend_with_audiosr = crashing_audiosr
 
-with patch("app.ai_pipeline.audiosr_available", return_value=True), \
+with patch("app.ai_pipeline.audiosr_import_error", return_value=None), \
+     patch.object(get_settings(), "allow_audiosr_without_cuda", True), \
      patch.dict("sys.modules", {"app.audiosr_adapter": fake_adapter}):
     r = bandwidth_extend(audio.samples, audio.sample_rate, cutoff, device)
 print(f"Case 2 -> method={r.method}  rate={r.sample_rate}  shape={r.samples.shape}")

@@ -1,0 +1,34 @@
+# Runtime dependencies for the API and the CPU worker (Python 3.11).
+# Pinned to the exact versions this project was tested with. Upgrade deliberately, then run `pytest`.
+#
+# Install:  pip install -r requirements.txt
+# AudioSR is NOT listed here on purpose: it pins numpy<=1.23.5 and breaks this stack.
+# It runs on a separate Python 3.10 GPU worker, see requirements-gpu.txt.
+
+# Web API
+fastapi==0.163.1
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.3
+
+# Background jobs
+celery[redis]==5.7.0
+redis==8.1.0
+
+# Object storage (AWS S3 or Cloudflare R2)
+boto3==1.44.3
+
+# DSP gatekeeper and mastering
+numpy==2.4.6
+scipy==1.17.1
+soundfile==0.14.0          # bundles libsndfile 1.2.2 (MP3 read support)
+librosa==0.11.0
+pyloudnorm==0.2.0
+soxr==1.1.0                # high-quality resampler used by librosa
+
+# Compute (GPU when available, CPU fallback).
+# Note: this torch/torchaudio pair is the combination tested here; the pipeline only uses
+# torchaudio.functional.resample, which is pure PyTorch. On a CUDA host, install the matching
+# CUDA wheels from https://download.pytorch.org/whl/ instead.
+torch==2.15.0
+torchaudio==2.11.1

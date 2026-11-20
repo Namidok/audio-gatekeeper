@@ -109,9 +109,12 @@ def extend_with_audiosr(samples: np.ndarray, orig_sr: int, cutoff_hz: float,
         raise ValueError(f"AudioSR only produces {AI_RATE} Hz audio, not {target_sr} Hz")
 
     model = _load_model(device.type)
-    base = resample(samples, orig_sr, AI_RATE, device)     # Step 12: bring it to 48 kHz first
-    channels = [
-        _process_channel(model, base[:, ch], cutoff_hz, label=f"channel {ch + 1}/{base.shape[1]}")
-        for ch in range(base.shape[1])
-    ]
-    return np.stack(channels, axis=1)
+    base = resample(samples, orig_sr, AI_RATE, device)     # bring it to 48 kHz first
+
+    # Run the AI once, on the mid (L+R)/2 signal, and add only the NEW highs it generates to every
+    # channel. Running left and right separately would generate different, uncorrelated highs per
+    # side (a smeared stereo image) and cost twice the GPU time. Below the cutoff, every channel
+    # keeps its original samples, so the stereo image there is untouched.
+    mid = base.mean(axis=1)
+    new_highs = _process_channel(model, mid, cutoff_hz, label="mid") - mid
+    return (base + new_highs[:, None]).astype(np.float32)

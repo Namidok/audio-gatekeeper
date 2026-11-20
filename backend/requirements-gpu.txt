@@ -1,0 +1,19 @@
+# OPTIONAL: the AudioSR GPU worker. Runs in its OWN Python 3.10 environment / image
+# (see docker/worker-gpu.Dockerfile), consuming only the "gpu" Celery queue.
+#
+# Why separate: AudioSR pins numpy<=1.23.5, which is incompatible with the main stack.
+# Licensing: AudioSR code is MIT. The "basic" model weights on Hugging Face are tagged
+# Apache-2.0 but have an empty model card and undisclosed training data, and a downstream
+# copy claims CC-BY-NC-4.0. Get written confirmation from the author before commercial use.
+#
+# NOT installed or tested in this repository (no CUDA available where it was built).
+# Treat this as a starting point and pin what you verify on your GPU host.
+audiosr
+pydantic-settings
+celery[redis]
+redis
+boto3
+scipy
+soundfile
+librosa
+pyloudnorm

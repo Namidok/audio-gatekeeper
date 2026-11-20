@@ -1,0 +1,56 @@
+# Local stack: redis + api + cpu worker + dashboard. Storage stays in YOUR S3/R2 bucket.
+#   cp backend/.env.example backend/.env   # fill in bucket + credentials
+#   docker compose up --build
+#   open http://localhost:3000
+# Optional AI upsampling on an NVIDIA GPU host:
+#   GPU_QUEUE_ENABLED=true docker compose --profile gpu up --build
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]   # jobs are disposable; no persistence
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    env_file: backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      GPU_QUEUE_ENABLED: ${GPU_QUEUE_ENABLED:-false}
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on: { redis: { condition: service_healthy } }
+
+  worker:
+    build: { context: ., dockerfile: docker/worker.Dockerfile }
+    env_file: backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      GPU_QUEUE_ENABLED: ${GPU_QUEUE_ENABLED:-false}
+    depends_on: { redis: { condition: service_healthy } }
+    deploy:
+      resources:
+        limits: { memory: 4g }       # an over-long file fails this container, not the host
+
+  worker-gpu:
+    profiles: ["gpu"]
+    build: { context: ., dockerfile: docker/worker-gpu.Dockerfile }
+    env_file: backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on: { redis: { condition: service_healthy } }
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args: { NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000" }
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [api]

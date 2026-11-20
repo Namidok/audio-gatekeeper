@@ -1,0 +1,141 @@
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 20px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Three meter bars: amber, blue and the line colour */
+.mark {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.mark span {
+  width: 5px;
+  border-radius: 2px;
+  background: var(--original);
+  height: 60%;
+}
+
+.mark span:nth-child(2) {
+  background: var(--enhanced);
+  height: 100%;
+}
+
+.mark span:nth-child(3) {
+  background: var(--line-strong);
+  height: 40%;
+}
+
+.name {
+  font-size: var(--step-3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--step-1);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.ok .dot {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+.warn .dot {
+  background: var(--warn);
+}
+
+.crit .dot {
+  background: var(--crit);
+}
+
+.crit {
+  color: var(--text);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: transparent;
+  font-size: var(--step-1);
+}
+
+.toggle:hover {
+  border-color: var(--line-strong);
+}
+
+.switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background 0.15s;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s;
+}
+
+.toggle[aria-pressed="true"] .switch {
+  background: var(--enhanced);
+}
+
+.toggle[aria-pressed="true"] .switch::after {
+  transform: translateX(12px);
+  background: var(--bg);
+}
+
+@media (max-width: 560px) {
+  .themeText {
+    display: none;
+  }
+}

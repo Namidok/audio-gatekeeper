@@ -1,24 +1,14 @@
-"use client";
+// The page shell is prerendered; the dashboard reads ?job=<id> in the browser, so it sits
+// inside a Suspense boundary (required by Next.js for useSearchParams).
+import { Suspense } from "react";
 
-// Step 22: a temporary page that only checks the frontend can talk to the backend.
-// Steps 23-25 replace it with the real dashboard.
-import { useEffect, useState } from "react";
-
-import { checkHealth } from "@/lib/api";
+import Dashboard from "@/app/components/Dashboard";
+import DashboardSkeleton from "@/app/components/DashboardSkeleton";
 
 export default function Home() {
-  const [status, setStatus] = useState("Checking the API…");
-
-  useEffect(() => {
-    checkHealth()
-      .then((h) => setStatus(`API: ${h.status} · Redis: ${h.redis ? "connected" : "not connected"}`))
-      .catch((err: Error) => setStatus(`Error: ${err.message}`));
-  }, []);
-
   return (
-    <main style={{ padding: 48, fontFamily: "system-ui, sans-serif" }}>
-      <h1>AI Audio Quality Gatekeeper</h1>
-      <p>{status}</p>
-    </main>
+    <Suspense fallback={<DashboardSkeleton />}>
+      <Dashboard />
+    </Suspense>
   );
 }

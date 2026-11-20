@@ -1,0 +1,17 @@
+{
+  "Rules": [
+    {
+      "ID": "delete-uploads-after-7-days",
+      "Filter": { "Prefix": "uploads/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 7 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "delete-outputs-after-7-days",
+      "Filter": { "Prefix": "outputs/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 7 }
+    }
+  ]
+}
