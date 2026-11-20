@@ -87,8 +87,11 @@ queued -> downloading -> diagnosing -> [enhancing] -> mastering -> uploading -> 
      is reported only.
    - Loudness: BS.1770 via pyloudnorm.
    - The result is a 0–100 score and two flags: `declip` and `upsample`.
-3. **De-clip** (if flagged): cubic-spline reconstruction of each flat top, with the boost bounded
-   at +6 dB.
+3. **De-clip** (if flagged): A-SPADE sparse reconstruction (Kitić et al. 2015; Záviška et al. 2019).
+   Each 46 ms frame that contains clipping is rebuilt as the sparsest spectrum that keeps the
+   unclipped samples exactly and is at least as tall as the flat top. Frames without clipping are
+   untouched, and rebuilt peaks are capped at +12 dB. It runs at about 4–25x real time on CPU,
+   depending on how much is clipped.
 4. **Upsample:**
    - If the bandwidth flag is set: AudioSR on a CUDA worker. It runs on the mid channel only and
      adds the new highs to both channels, so the stereo image below the cutoff is untouched.

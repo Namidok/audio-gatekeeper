@@ -55,6 +55,10 @@ From [docs/BENCHMARKS.md](docs/BENCHMARKS.md): nine synthetic 30-second test fil
 - Every non-silent track mastered to **-14.0 LUFS** with a true peak of **-1.19 to -1.20 dBTP**.
 - Clipped tracks went from 0.14–0.17% flat-topped samples to **0.000%**. That includes clipping
   that was later turned down, which an absolute 0.99 threshold misses.
+- Against the **known original**, de-clipping cut the error on destroyed samples by **3.0–7.2 dB on
+  a real song**. The earlier spline method made light clipping *worse*, so it was replaced.
+- Without AudioSR, band-limited MP3s are unchanged apart from volume. That is measured and stated
+  in the product.
 - Clean, 16 kHz-cutoff and quiet tracks **bypassed repair**.
 - 11 kHz-cutoff tracks were correctly flagged. Without AudioSR they are reported as
   **"partial: highs not restored"**.
@@ -133,9 +137,10 @@ These are stated plainly, because they matter for an evaluation.
   and the product says so.
 - **AudioSR weights licence is unconfirmed for commercial use.** The model card is empty and a
   downstream copy claims CC-BY-NC. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
-- **De-clipping is a cubic-spline repair.** It reduced the error on clipped tonal peaks by about
-  7–14 dB in tests, but made no measurable difference on noise-like transients, and it can't see
-  clipping that a lossy codec has smeared.
+- **De-clipping is partial on heavy clipping.** The A-SPADE de-clipper brought destroyed samples
+  1.4–7.2 dB closer to the known original in every test, including a real song. On heavy clipping
+  (about 20% of samples destroyed), less than half the error remains, which is audibly better but
+  not the clean original. It can't see clipping that a lossy codec has smeared.
 - **Benchmarks use synthetic signals only.** There is no listening test and no real-music corpus yet.
 - **No real authentication.** There is a rate limit, an optional API key and idempotent jobs.
   Job links act as bearer capabilities. OAuth/OIDC and per-tenant quotas are on the roadmap.

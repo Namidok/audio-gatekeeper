@@ -41,7 +41,22 @@ def test_declip_keeps_sign_and_bounds_the_boost():
     fixed, _ = declip(clipped)
     flat = np.abs(clipped) >= 0.99
     assert np.all(np.sign(fixed[flat]) == np.sign(clipped[flat]))
-    assert np.abs(fixed).max() <= 2.0 + 1e-6            # at most +6 dB above the flat top
+    assert np.all(np.abs(fixed[flat]) >= np.abs(clipped[flat]) - 1e-6)   # never below the flat top
+    assert np.abs(fixed).max() <= 4.0 + 1e-6            # safety cap: at most +12 dB above the flat top
+
+
+def test_declip_improves_music_like_material_at_light_clipping():
+    """Regression: the earlier cubic spline made real music WORSE at light clipping (+3 dB)."""
+    truth = music(seconds=10, sr=44_100, peak_dbfs=-1.0, seed=1, slope=0.5, crest=0.5).astype(np.float64)
+    truth *= 10 ** (6 / 20)
+    clipped = np.clip(truth, -1, 1).astype(np.float32)
+    fixed, repaired = declip(clipped)
+    destroyed = np.abs(truth) > 1
+    before = np.sqrt(np.mean((clipped[destroyed] - truth[destroyed]) ** 2))
+    after = np.sqrt(np.mean((fixed[destroyed] - truth[destroyed]) ** 2))
+    assert repaired > 0 and 20 * np.log10(after / before) < -1.0
+    untouched = ~(np.abs(clipped) >= 0.99 * np.abs(clipped).max())
+    np.testing.assert_array_equal(fixed[untouched], clipped[untouched])   # unclipped samples never change
 
 
 # ---------- resample ----------

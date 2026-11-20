@@ -13,7 +13,7 @@ PYTHONPATH=../.. python ../make_clip_tests.py
 
 | Script | What it does | Needs |
 |---|---|---|
-| `benchmark.py` | Runs the whole pipeline on a folder of files and reports measured before/after numbers (see `docs/BENCHMARKS.md`). Run it from `backend/`. | nothing external |
+| `benchmark.py` | Runs the whole pipeline on a folder of files and reports measured before/after numbers, how much each file really changed, and de-clipping accuracy against a known original (`--truth-pair clean.wav clipped.wav --boost-db 9`). See `docs/BENCHMARKS.md`. Run it from `backend/`. | nothing external |
 | `make_*.py` | Write synthetic test signals (tones, clipped, band-limited, loud/quiet) into the current folder | nothing external |
 | `make_test_versions.py` | Makes clipped and MP3-like versions of a song you pass in (use only audio you have rights to) | nothing external |
 | `test_declip.py`, `test_resample.py`, `test_master.py`, `test_upsample.py`, `test_audiosr_adapter.py` | Print-and-listen demos of single pipeline stages | the files from `make_*.py` |

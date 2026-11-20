@@ -66,8 +66,11 @@
   official: -14 LUFS, -1 dBTP, and -2 dBTP for masters louder than -14 LUFS.
 - **"Why not just use the 85% rolloff?"** It flags most normal music. It is still reported, but
   the decision uses a spectral-cliff detector: a 20 dB drop within 1 kHz.
-- **"Does de-clipping always help?"** It measurably helps on tonal and bass peaks (about 7–14 dB
-  less error in tests) and doesn't change noise-like transients. Clipping smeared by a lossy
-  codec can't be detected.
+- **"Does de-clipping always help?"** Against known originals it brought the destroyed samples
+  closer in every test: 3.0–7.2 dB on a real song, 1.4–3.3 dB on synthetic material. Heavy
+  clipping is only partly repaired. An earlier spline method made light clipping worse and was
+  replaced because of that measurement. Clipping smeared by a lossy codec can't be detected.
+- **"Why do MP3s sound the same?"** Without the GPU model, they are unchanged apart from volume
+  (measured), and the product says "Highs not restored" instead of pretending.
 - **"What about the AI model's licence?"** The code is MIT. The weights' licence is unconfirmed
   for commercial use, and that's flagged in `THIRD_PARTY_LICENSES.md`.

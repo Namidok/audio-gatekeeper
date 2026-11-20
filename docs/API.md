@@ -112,7 +112,7 @@ Step 3: poll for progress and results. Signed links are fresh on every call and 
   "processing": {
     "outcome": "partial", "upsample_method": "resample_only", "highs_restored": false, "ai_bypassed": false,
     "steps": [
-      { "kind": "declip", "status": "applied", "summary": "Rebuilt the flattened peaks", "detail": "declip: 46 flat tops repaired (cubic spline)" },
+      { "kind": "declip", "status": "applied", "summary": "Rebuilt the flattened peaks", "detail": "declip: 46 flat tops rebuilt (A-SPADE sparse reconstruction)" },
       { "kind": "bandwidth_extension", "status": "fallback", "summary": "Converted to 48 kHz without restoring the missing highs", "detail": "resample_only 44100 -> 48000 Hz (torchaudio sinc/Kaiser)" },
       { "kind": "master", "status": "applied", "summary": "Mastered for Spotify (-14 LUFS): set loudness to -14 LUFS, peaks at or below -1 dBTP", "detail": "gain -2.3 dB, limiter 4.2 dB, true peak -1.20 dBTP (16x oversampled)" }
     ],

@@ -17,7 +17,7 @@ import pyloudnorm as pyln
 import soundfile as sf
 import torch
 import torchaudio.functional as AF
-from scipy.interpolate import CubicSpline
+import scipy.fft as sp_fft
 from scipy.ndimage import minimum_filter1d, uniform_filter1d
 from scipy.signal import firwin, resample_poly
 
@@ -93,32 +93,91 @@ def describe_device(device: torch.device) -> str:
 # --------------------------------------------------------------------------- #
 # De-clipping
 # --------------------------------------------------------------------------- #
+# A-SPADE (sparse audio de-clipping): Kitic et al. 2015; Zaviska et al. 2019. Each short frame is
+# rebuilt as the sparsest spectrum that (1) keeps every unclipped sample exactly and (2) is at least
+# as tall as the flat top wherever the waveform was clipped. Measured against known originals it
+# beats the earlier cubic spline on every test, including real music (see docs/BENCHMARKS.md).
+SPADE_FRAME = 2048        # samples per frame (46 ms at 44.1 kHz), 75% overlap
+SPADE_ITERATIONS = 40     # upper bound per frame; most frames converge earlier
+SPADE_SPARSITY_STEP = 8   # spectral coefficients added per iteration
+SPADE_TOLERANCE = 0.1     # convergence: distance between the frame and its sparse approximation
+SPADE_BATCH = 512         # frames processed together (bounds memory on long, heavily clipped tracks)
+MAX_BOOST = 4.0           # safety cap: a rebuilt peak is at most 4x (+12 dB) its flat top
+
+
+def _aspade(frames: np.ndarray, low: np.ndarray, high: np.ndarray) -> np.ndarray:
+    """A-SPADE on a batch of windowed frames; the feasible set is low <= x <= high."""
+    n_frames, n = frames.shape
+    m = 2 * n                                             # 2x redundant DFT
+    bins = m // 2 + 1
+    root = np.float32(np.sqrt(m))
+    analysis = lambda x: sp_fft.rfft(x, n=m, axis=1, workers=-1) / root            # noqa: E731
+    synthesis = lambda z: sp_fft.irfft(z, n=m, axis=1, workers=-1)[:, :n] * root   # noqa: E731
+
+    x = frames.astype(np.float32)
+    dual = np.zeros((n_frames, bins), np.complex64)
+    active = np.arange(n_frames)
+    k = SPADE_SPARSITY_STEP
+    for _ in range(SPADE_ITERATIONS):
+        v = analysis(x[active]) + dual[active]
+        magnitude = np.abs(v)
+        if k < bins:                                     # keep the k largest coefficients per frame
+            threshold = np.partition(magnitude, bins - k, axis=1)[:, bins - k][:, None]
+            v = np.where(magnitude >= threshold, v, 0)
+        candidate = np.clip(synthesis(v - dual[active]), low[active], high[active])  # project: stay consistent
+        residual = analysis(candidate) - v
+        x[active] = candidate
+        dual[active] += residual
+        converged = np.linalg.norm(residual, axis=1) * np.sqrt(2) <= SPADE_TOLERANCE
+        active = active[~converged]
+        if active.size == 0:
+            break
+        k += SPADE_SPARSITY_STEP
+    return x
+
+
 def declip_channel(channel: np.ndarray, level: float, min_run: int = 3,
-                   tolerance: float = 1e-5, anchors: int = 4,
-                   max_boost: float = 2.0) -> tuple[np.ndarray, int]:
-    """Rebuild flat tops with a cubic spline through the samples around them."""
-    out = channel.astype(np.float64).copy()
-    repaired = 0
+                   tolerance: float = 1e-5) -> tuple[np.ndarray, int]:
+    """Rebuild the flat tops of one channel. Unclipped samples are returned unchanged."""
+    runs = flat_top_runs(channel, level, min_run, tolerance)   # same rule as the detector
+    if not runs:
+        return channel.astype(np.float32, copy=True), 0
 
-    for start, end in flat_top_runs(channel, level, min_run, tolerance):   # same rule as the detector
-        left = np.arange(max(0, start - anchors), start)
-        right = np.arange(end, min(len(channel), end + anchors))
-        if len(left) < 2 or len(right) < 2:
-            continue                                  # too close to the file edge
+    n, frame = len(channel), SPADE_FRAME
+    hop, pad = frame // 4, frame
+    y = np.concatenate([np.zeros(pad), channel.astype(np.float64), np.zeros(pad + frame)])
+    low, high = y.copy(), y.copy()
+    clipped = np.zeros(len(y), bool)
+    for start, end in runs:
+        seg = slice(start + pad, end + pad)
+        clipped[seg] = True
+        positive = y[seg] > 0
+        low[seg] = np.where(positive, y[seg], -np.inf)   # positive flat top: the real value is at least this
+        high[seg] = np.where(positive, np.inf, y[seg])   # negative flat top: the real value is at most this
 
-        x = np.concatenate((left, right))
-        spline = CubicSpline(x, channel[x].astype(np.float64))
-        gap = np.arange(start, end)
-        guess = spline(gap)
+    window = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(frame) / frame)).astype(np.float32)  # sums to 2 at hop N/4
+    starts = np.arange(0, len(y) - frame + 1, hop)
+    with_clips = starts[clipped[starts[:, None] + np.arange(frame)].any(axis=1)]
 
-        flat = channel[start:end].astype(np.float64)
-        sign = np.sign(flat)
-        # The real peak was at least as tall as the flat top, and not absurdly taller
-        magnitude = np.clip(np.abs(guess), np.abs(flat), np.abs(flat) * max_boost)
-        out[gap] = sign * magnitude
-        repaired += 1
+    # Every sample is covered by 4 windows summing to 2. Start from "nothing changed" and swap in
+    # the rebuilt frames only where there was clipping.
+    total = 2.0 * y
+    offsets = np.arange(frame)
+    for b in range(0, len(with_clips), SPADE_BATCH):
+        index = with_clips[b:b + SPADE_BATCH, None] + offsets
+        with np.errstate(invalid="ignore"):              # inf * 0 at the window edges -> nan, replaced below
+            lo = np.nan_to_num(low[index] * window, nan=-np.inf, neginf=-np.inf, posinf=np.inf)
+            hi = np.nan_to_num(high[index] * window, nan=np.inf, neginf=-np.inf, posinf=np.inf)
+        rebuilt = _aspade(y[index] * window, lo, hi)
+        for row, start in enumerate(with_clips[b:b + SPADE_BATCH]):
+            total[start:start + frame] += rebuilt[row] - y[start:start + frame] * window
 
-    return out.astype(np.float32), repaired
+    out = (total / 2.0)[pad:pad + n]
+    keep = ~clipped[pad:pad + n]
+    out[keep] = channel[keep]                            # unclipped samples stay exactly as they were
+    flat = channel[~keep].astype(np.float64)             # safety: never more than MAX_BOOST x the flat top
+    out[~keep] = np.sign(flat) * np.clip(np.abs(out[~keep]), np.abs(flat), np.abs(flat) * MAX_BOOST)
+    return out.astype(np.float32), len(runs)
 
 
 def declip(samples: np.ndarray, threshold: float = 0.99) -> tuple[np.ndarray, int]:
@@ -449,7 +508,7 @@ def enhance(input_path: str | Path, output_path: str | Path, report: DiagnosticR
             stage("enhancing")
             samples, repaired = declip(samples, threshold=settings.clip_threshold)
             result.add_step("declip", "applied", "Rebuilt the flattened peaks",
-                            f"declip: {repaired} flat tops repaired (cubic spline)")
+                            f"declip: {repaired} flat tops rebuilt (A-SPADE sparse reconstruction)")
         else:
             result.add_step("declip", "skipped", "No clipping to repair")
 
