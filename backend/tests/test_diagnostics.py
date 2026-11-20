@@ -138,6 +138,19 @@ def test_too_many_channels_is_refused(tmp_path):
     assert err.value.code == "too_many_channels"
 
 
+def test_out_of_memory_is_not_blamed_on_the_file(tmp_path, monkeypatch):
+    """MemoryError is our problem, not a damaged upload: it must reach the retry/internal path."""
+    import app.dsp_diagnostics as dsp
+
+    def no_memory(*args, **kwargs):
+        raise MemoryError
+
+    path = write(tmp_path / "ok.wav", sine(440, seconds=1), 48_000)
+    monkeypatch.setattr(dsp.sf, "read", no_memory)
+    with pytest.raises(MemoryError):
+        load_audio(path)
+
+
 def test_garbage_bytes_are_refused(tmp_path):
     path = tmp_path / "fake.wav"
     path.write_bytes(b"this is not audio" * 100)

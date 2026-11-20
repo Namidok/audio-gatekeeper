@@ -176,7 +176,9 @@ def test_gpu_routing_hands_over_band_limited_jobs(env, settings, monkeypatch):
     monkeypatch.setattr(worker, "enqueue_job", lambda job_id, queue="default": sent.append(queue))
     job_id = _submit(store, storage, wav_bytes(lowpass(music(seconds=2, sr=44_100), 44_100, 11_000), 44_100))
     assert _run(job_id)["status"] == "routed_to_gpu"
-    assert sent == ["gpu"] and store.get(job_id)["status"] == "queued"
+    routed = store.get(job_id)
+    assert sent == ["gpu"] and routed["status"] == "queued" and routed["queue"] == "gpu"
+    assert routed["attempts"] == 0          # the hand-over doesn't use up one of the GPU worker's attempts
 
 
 def test_workdir_is_cleaned_up_after_failure(env, monkeypatch, tmp_path):

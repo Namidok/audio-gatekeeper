@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 
 from app.celery_app import enqueue_job, redis_db_url
 from app.config import PROFILES, get_settings
-from app.job_store import JobStore, get_job_store, is_stalled
+from app.job_store import FINISHED, JobStore, get_job_store, is_stalled
 from app.schemas import (
     CreateJobRequest,
     ErrorResponse,
@@ -60,7 +60,8 @@ app.add_middleware(
 
 JOB_ID_PATTERN = re.compile(r"[0-9a-f]{32}")
 WRITE_GUARDS = [Depends(require_api_key), Depends(rate_limit)]
-ERRORS = {400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 413: {"model": ErrorResponse},
+ERRORS = {400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse},
+          413: {"model": ErrorResponse},
           415: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 502: {"model": ErrorResponse},
           503: {"model": ErrorResponse}}
 
@@ -107,6 +108,9 @@ def _job_response(job: dict, storage: Storage) -> JobResponse:
         download_url=(storage.presign_download(job["output_ref"], f"{stem}_mastered.wav", attachment=True)
                       if completed else None),
         links_expire_in=s.download_link_seconds,
+        queue=job.get("queue") or "default",
+        attempts=job.get("attempts", 0),
+        max_attempts=s.job_max_attempts,
         waveforms=job.get("waveforms"),
         created_at=job["created_at"],
         updated_at=job["updated_at"],
@@ -194,9 +198,9 @@ def create_job(body: CreateJobRequest, store: JobStore = Depends(get_job_store),
     if existing_id is not None:
         store.delete(job["job_id"])
         existing = store.get(existing_id)
-        if existing is not None:
+        if existing is not None and existing["status"] != "failed":
             return _job_response(existing, storage)          # same upload sent twice: same job
-        store.release_upload(body.object_key)                 # the old job expired: start over
+        store.release_upload(body.object_key)                 # the old job expired or failed: start over
         job = store.create(safe_display_name(body.filename), body.object_key, input_etag=info.etag,
                            loudness_profile=profile)
         store.claim_upload(body.object_key, job["job_id"])
@@ -226,8 +230,13 @@ def get_job(job_id: str, store: JobStore = Depends(get_job_store),
 @app.delete("/jobs/{job_id}", status_code=204, dependencies=WRITE_GUARDS, responses=ERRORS)
 def delete_job(job_id: str, store: JobStore = Depends(get_job_store),
                storage: Storage = Depends(get_storage)) -> Response:
-    """Delete a job and every file it created (the upload, the master and the previews)."""
+    """Delete a job and every file it created (the upload, the master and the previews).
+
+    Only finished jobs: a running worker would otherwise write its results back after the delete.
+    """
     job = _load_job(job_id, store)
+    if job["status"] not in FINISHED:
+        raise HTTPException(status_code=409, detail="The job is still processing. Delete it once it has finished.")
     keys = [job["input_ref"], job.get("output_ref"), *(job.get("preview_refs") or {}).values()]
     for key in filter(None, keys):
         storage.delete(key)

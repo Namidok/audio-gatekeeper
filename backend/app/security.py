@@ -15,11 +15,15 @@ RATE_PREFIX = "agk:rl:"
 
 
 def client_ip(request: Request) -> str:
-    """The caller's IP. X-Forwarded-For is only trusted when we run behind our own proxy."""
+    """The caller's IP. X-Forwarded-For is only trusted when we run behind our own proxy.
+
+    Proxies APPEND the address they saw, so the rightmost entry is the one our (single, trusted)
+    proxy added. Entries further left were sent by the client and can be anything.
+    """
     if get_settings().trust_proxy_headers:
-        forwarded = request.headers.get("x-forwarded-for", "")
+        forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            return forwarded[-1]
     return request.client.host if request.client else "unknown"
 
 

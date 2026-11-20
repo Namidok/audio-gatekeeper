@@ -94,6 +94,23 @@ def test_audiosr_success_is_reported_as_restored(settings, monkeypatch):
     assert r.method == "audiosr" and "rebuilt" in r.note
 
 
+def test_audiosr_output_is_resampled_to_a_non_48k_target(settings, monkeypatch):
+    """AudioSR only makes 48 kHz; a 44.1 kHz target must still work (code review finding)."""
+    monkeypatch.setattr(settings, "enable_audiosr", True)
+    monkeypatch.setattr(settings, "allow_audiosr_without_cuda", True)
+    rates = []
+
+    def fake(samples, sr, cutoff, device, target_sr):
+        rates.append(target_sr)
+        return np.zeros((48_000, 2), np.float32)        # one second at 48 kHz
+
+    with patch.object(ai_pipeline, "audiosr_import_error", return_value=None), \
+         patch.dict("sys.modules", {"app.audiosr_adapter": _fake_adapter(fake)}):
+        r = bandwidth_extend(music(seconds=1, sr=44_100), 44_100, 11_000, pick_device("cpu"), target_sr=44_100)
+    assert rates == [48_000]
+    assert r.method == "audiosr" and r.sample_rate == 44_100 and r.samples.shape[0] == 44_100
+
+
 def test_audiosr_adapter_adds_identical_new_highs_to_both_channels(monkeypatch):
     """Mid-only AI keeps the stereo image below the cutoff exactly (fake model, no AudioSR needed)."""
     from app import audiosr_adapter

@@ -110,6 +110,8 @@ def test_stalled_detection(settings):
     assert not is_stalled({"status": "mastering", "updated_at": fresh})
     assert not is_stalled({"status": "completed", "updated_at": old})
     assert not is_stalled({"status": "queued", "attempts": 0, "updated_at": old})   # just a long queue
+    # re-queued for a retry or for the GPU queue: still just waiting (code review finding)
+    assert not is_stalled({"status": "queued", "attempts": 1, "updated_at": old})
 
 
 def test_store_uses_injected_client():

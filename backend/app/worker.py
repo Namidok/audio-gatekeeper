@@ -102,7 +102,10 @@ def run_job(store: JobStore, job: dict, workdir: Path) -> str:
 
     # AI upsampling needs a GPU worker: hand the job over instead of crawling on a CPU
     if settings.gpu_queue_enabled and settings.worker_role == "cpu" and report.flags.upsample:
-        store.update(job_id, status="queued", queue=GPU_QUEUE,
+        # A hand-over is not a failed attempt: give it back, so the GPU worker gets the full
+        # JOB_MAX_ATTEMPTS and "attempt N of M" in the dashboard counts GPU tries only.
+        attempts = (store.get(job_id) or {}).get("attempts", 1)
+        store.update(job_id, status="queued", queue=GPU_QUEUE, attempts=max(0, attempts - 1),
                      message="Waiting for a GPU worker to restore the high frequencies")
         enqueue_job(job_id, queue=GPU_QUEUE)
         return "routed_to_gpu"

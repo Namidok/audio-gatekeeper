@@ -127,6 +127,7 @@ Step 3: poll for progress and results. Signed links are fresh on every call and 
   "enhanced_url": "https://…/outputs/<job>/enhanced_preview.flac?…",
   "download_url": "https://…/outputs/<job>/master.wav?…response-content-disposition=attachment…",
   "links_expire_in": 1800,
+  "queue": "default", "attempts": 1, "max_attempts": 3,
   "waveforms": { "original": [0.41, 0.52, "… 800 values"], "enhanced": ["… 800 values"] },
   "created_at": "2026-11-19T00:53:02.118421+00:00",
   "updated_at": "2026-11-19T00:53:04.903117+00:00"
@@ -141,6 +142,13 @@ Step 3: poll for progress and results. Signed links are fresh on every call and 
 
 `status` values: `queued`, `downloading`, `diagnosing`, `enhancing`, `mastering`, `uploading`,
 `completed`, `failed`.
+
+A job can return to `queued` after it started, and the worker then starts over from
+`downloading`. There are two reasons:
+- **A retry after a temporary problem:** `queue` stays `"default"` and `attempts` shows how many
+  starts have happened, up to `max_attempts`.
+- **A hand-over to the GPU worker for AI repair:** `queue` becomes `"gpu"`, and `attempts` is reset
+  for the GPU worker's own tries. The hand-over doesn't count as a failed attempt.
 
 | Code | When |
 |---|---|
@@ -162,5 +170,6 @@ Step 3: poll for progress and results. Signed links are fresh on every call and 
 
 ## `DELETE /jobs/{job_id}`
 
-Deletes the upload, the master, the previews and the job record. Returns **204**, or **404** if
-the job doesn't exist. Rate-limited, and needs the API key when one is configured.
+Deletes the upload, the master, the previews and the job record. Returns **204**, **404** if
+the job doesn't exist, or **409** if it is still processing (a running worker would otherwise
+write its results back after the delete). Rate-limited, and needs the API key when one is configured.

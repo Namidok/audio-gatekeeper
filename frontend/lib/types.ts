@@ -112,6 +112,9 @@ export interface Job {
   enhanced_url: string | null;
   download_url: string | null;
   links_expire_in: number | null;
+  queue: "default" | "gpu"; // "gpu": handed to the AI worker for high-frequency repair
+  attempts: number; // worker starts so far (on the current queue)
+  max_attempts: number;
   waveforms: Waveforms | null;
   created_at: string;
   updated_at: string;

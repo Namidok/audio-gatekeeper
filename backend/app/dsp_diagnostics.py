@@ -49,7 +49,7 @@ def check_limits(path: str | Path):
     s = get_settings()
     try:
         info = sf.info(str(path))
-    except Exception as exc:  # libsndfile raises several types for unreadable files
+    except (RuntimeError, TypeError) as exc:  # libsndfile's "can't read this": LibsndfileError is a RuntimeError
         raise UserInputError("This file couldn't be read as audio. It may be damaged, "
                              "or not really the format its name suggests.", "unreadable") from exc
     if info.frames <= 0 or info.samplerate <= 0:
@@ -75,7 +75,7 @@ def load_audio(path: str | Path) -> AudioData:
 
     try:
         samples, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
-    except Exception as exc:
+    except (RuntimeError, TypeError) as exc:   # decode errors only; MemoryError/OSError are ours, not the file's
         raise UserInputError("This file couldn't be decoded. It may be damaged.", "undecodable") from exc
 
     if samples.shape[0] == 0:

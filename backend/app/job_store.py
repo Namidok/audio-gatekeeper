@@ -155,8 +155,10 @@ def is_stalled(job: dict) -> bool:
     if job["status"] in FINISHED:
         return False
     limit = s.job_time_limit_seconds + 300          # hard time limit + 5 minutes grace
-    if job["status"] == "queued" and job.get("attempts", 0) == 0:
-        limit = max(limit, 6 * 3600)                # waiting in a long queue is not a stall
+    if job["status"] == "queued":
+        # Waiting in a queue is not a stall: first submission, a retry, or a hand-over to the GPU
+        # queue. A worker that dies mid-job leaves a *running* status, which the short limit catches.
+        limit = max(limit, 6 * 3600)
     return seconds_since(job["updated_at"]) > limit
 
 

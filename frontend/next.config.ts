@@ -8,8 +8,10 @@ const apiOrigin = (() => {
     return "http://localhost:8000";
   }
 })();
-// Browsers upload to and play from the bucket directly (signed links)
-const storageOrigins = "https://*.amazonaws.com https://*.r2.cloudflarestorage.com";
+// Browsers upload to and play from the bucket directly (signed links). AWS S3 and Cloudflare R2
+// by default; set NEXT_PUBLIC_STORAGE_ORIGINS (space-separated) for MinIO, Backblaze, etc.
+const storageOrigins =
+  process.env.NEXT_PUBLIC_STORAGE_ORIGINS?.trim() || "https://*.amazonaws.com https://*.r2.cloudflarestorage.com";
 
 // Note: Next.js needs inline scripts to hydrate the page; a nonce-based policy would require
 // rendering every request dynamically. See docs/SECURITY_PRIVACY.md.

@@ -53,6 +53,7 @@ export default function ABPlayer(props: Props) {
   const playToken = useRef(0);
   const resumeAt = useRef<Record<Side, number | null>>({ original: null, enhanced: null });
   const refreshes = useRef(0);
+  const recovering = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [active, setActive] = useState<Side>("enhanced");
@@ -168,15 +169,18 @@ export default function ABPlayer(props: Props) {
 
   /** A signed link stopped working (usually: it expired). Get fresh ones and resume in place. */
   async function recover(side: Side) {
+    if (recovering.current) return; // both players fail at the same expiry: renew once for both
     if (refreshes.current >= 2) {
       setError(
         `The ${side === "original" ? "original" : "processed"} audio couldn't be loaded. If this keeps happening, the storage bucket's CORS rule may be missing GET.`,
       );
       return;
     }
-    refreshes.current += 1;
+    refreshes.current += 1; // consecutive failed renewals; reset once audio loads again
+    recovering.current = true;
     for (const s of SIDES) resumeAt.current[s] = audio.current[s]?.currentTime ?? null;
     const fresh = await onNeedFreshLinks();
+    recovering.current = false;
     if (!fresh) {
       setError("The audio links have expired and couldn't be renewed. Reload the page.");
       return;
@@ -296,6 +300,7 @@ export default function ABPlayer(props: Props) {
               }}
               onLoadedMetadata={(e) => {
                 const el = e.currentTarget;
+                refreshes.current = 0; // links work again: later expiries can be renewed too
                 setDurations((d) => ({ ...d, [side]: el.duration }));
                 const resume = resumeAt.current[side];
                 if (resume !== null) {

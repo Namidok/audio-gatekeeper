@@ -37,6 +37,7 @@ from app.dsp_diagnostics import (
 log = logging.getLogger(__name__)
 
 VALID_CHOICES = ("auto", "cuda", "mps", "cpu")
+AUDIOSR_RATE = 48_000   # the only rate AudioSR produces; other targets are resampled afterwards
 
 Outcome = Literal["bypassed", "repaired", "partial", "no_signal"]
 UpsampleMethod = Literal["audiosr", "resample_only", "none"]
@@ -200,7 +201,9 @@ def bandwidth_extend(samples: np.ndarray, orig_sr: int, cutoff_hz: float,
     else:
         try:
             from app.audiosr_adapter import extend_with_audiosr
-            out = extend_with_audiosr(samples, orig_sr, cutoff_hz, device, target_sr)
+            out = extend_with_audiosr(samples, orig_sr, cutoff_hz, device, AUDIOSR_RATE)  # AudioSR is 48 kHz only
+            if target_sr != AUDIOSR_RATE:
+                out = resample(out, AUDIOSR_RATE, target_sr, device)
             return UpsampleResult(out, target_sr, "audiosr",
                                   f"High frequencies above {cutoff_hz / 1000:.1f} kHz were rebuilt by AI (AudioSR).")
         except Exception as exc:

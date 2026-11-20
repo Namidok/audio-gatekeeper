@@ -33,7 +33,8 @@ export function useJob(jobId: string, initial: Job | null): JobState {
 
   const accept = useCallback((latest: Job) => {
     setJob(latest);
-    if (!FINISHED.includes(latest.status)) setLastStage(latest.status);
+    // "queued" again (a retry, or a hand-over to the GPU queue) is not progress: keep the furthest stage
+    if (!FINISHED.includes(latest.status) && latest.status !== "queued") setLastStage(latest.status);
   }, []);
 
   useEffect(() => {

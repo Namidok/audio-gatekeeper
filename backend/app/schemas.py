@@ -158,6 +158,9 @@ class JobResponse(BaseModel):
     enhanced_url: str | None = None   # signed playback link, only once the job is completed
     download_url: str | None = None   # signed "save as" link for the 24-bit WAV
     links_expire_in: int | None = None  # seconds until the signed links above stop working
+    queue: Literal["default", "gpu"] = "default"  # "gpu": handed to the AI worker for high-frequency repair
+    attempts: int = Field(0, ge=0)      # how many times a worker has started this job (on its current queue)
+    max_attempts: int = Field(1, ge=1)  # after this many starts the job is failed
     waveforms: Waveforms | None = None
     created_at: str
     updated_at: str

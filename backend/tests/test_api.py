@@ -89,7 +89,8 @@ def test_create_job_queues_once_and_hides_internals(client, storage, queued):
     _, job = _job(client, storage, "My Song.wav")
     assert job["status"] == "queued" and job["original_filename"] == "My Song.wav"
     assert queued == [(job["job_id"], "default")]
-    assert "input_ref" not in job and "attempts" not in job
+    assert "input_ref" not in job and "input_etag" not in job
+    assert (job["queue"], job["attempts"], job["max_attempts"]) == ("default", 0, 3)
     assert job["original_url"] and job["enhanced_url"] is None and job["download_url"] is None
 
 
@@ -155,8 +156,34 @@ def test_stalled_job_is_reported_as_failed(client, storage, store):
     assert body["status"] == "failed" and body["error_code"] == "stalled"
 
 
-def test_delete_job_removes_files_and_record(client, storage):
+def test_delete_running_job_is_refused(client, storage):
+    """A running worker would write its results back after the delete (code review finding)."""
     up, job = _job(client, storage)
+    assert client.delete(f"/jobs/{job['job_id']}").status_code == 409
+    assert storage.stat(up["object_key"]) is not None
+
+
+def test_resubmitting_after_a_failed_job_starts_a_new_one(client, storage, store, queued):
+    up, job = _job(client, storage)
+    store.fail(job["job_id"], "boom", "storage_error")
+    again = client.post("/jobs", json={"object_key": up["object_key"], "filename": "a.wav"}).json()
+    assert again["job_id"] != job["job_id"] and again["status"] == "queued" and len(queued) == 2
+
+
+def test_rate_limit_uses_the_proxy_added_address_not_the_spoofable_one(client, settings, monkeypatch):
+    monkeypatch.setattr(settings, "trust_proxy_headers", True)
+    monkeypatch.setattr(settings, "rate_limit_per_minute", 2)
+    codes = [
+        client.post("/uploads", json={"filename": "a.wav", "size_bytes": 1},
+                    headers={"X-Forwarded-For": f"203.0.113.{i}, 10.0.0.9"}).status_code
+        for i in range(3)          # the client varies the leftmost entry; our proxy appended 10.0.0.9
+    ]
+    assert codes == [200, 200, 429]
+
+
+def test_delete_job_removes_files_and_record(client, storage, store):
+    up, job = _job(client, storage)
+    store.set_status(job["job_id"], "completed")
     assert client.delete(f"/jobs/{job['job_id']}").status_code == 204
     assert storage.stat(up["object_key"]) is None
     assert client.get(f"/jobs/{job['job_id']}").status_code == 404
